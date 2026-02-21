@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-st.title ("Dashboard custumer shopping")
+st.title ("Dashboard customer shopping")
 
 # Cargar datos
 df = pd.read_csv("custumer_shopping_data.csv")
