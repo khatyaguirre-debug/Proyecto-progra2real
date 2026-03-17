@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 st.set_page_config(layout="wide")
 
-# Cargar datos
+# =========================
+# CARGAR DATOS
+# =========================
 @st.cache_data
 def load_data():
     df = pd.read_csv("customer_shopping_data.csv")
@@ -20,7 +23,9 @@ df = load_data()
 
 st.title("Análisis de desempeño comercial y hábitos de compra - Centros comerciales")
 
+# =========================
 # SIDEBAR - FILTROS
+# =========================
 st.sidebar.header("Filtros")
 
 genero = st.sidebar.multiselect(
@@ -60,8 +65,9 @@ if df_filtrado.empty:
     st.warning("No hay datos con los filtros seleccionados.")
     st.stop()
 
-
+# =========================
 # KPIs
+# =========================
 col1, col2, col3, col4 = st.columns(4)
 
 ticket_promedio = df_filtrado["price"].mean()
@@ -79,42 +85,58 @@ col4.metric("Método de pago preferido", metodo_pref)
 
 st.markdown("---")
 
+# =========================
+# GRÁFICOS
+# =========================
+
 col_g1, col_g2 = st.columns(2)
 
-# Centro comercial más visitado
+# -------------------------
+# Gráfico 1: Tendencias por mall (INTERACTIVO)
+# -------------------------
 with col_g1:
-    st.subheader("Centro Comercial más visitado")
-    mall_visitas = df_filtrado["shopping_mall"].value_counts()
-    st.bar_chart(mall_visitas)
+    st.subheader("Tendencia de compras por Centro Comercial")
 
-# Categorías por Mall (simplificado)
+    df_filtrado["mes"] = df_filtrado["invoice_date"].dt.to_period("M").astype(str)
+
+    mall_tendencia = st.selectbox(
+        "Selecciona un centro comercial (Tendencia)",
+        df_filtrado["shopping_mall"].unique()
+    )
+
+    datos_mall = df_filtrado[df_filtrado["shopping_mall"] == mall_tendencia]
+
+    trend_data = (
+        datos_mall
+        .groupby("mes")
+        .size()
+        .reset_index(name="Cantidad")
+    )
+
+    fig = px.line(
+        trend_data,
+        x="mes",
+        y="Cantidad",
+        markers=True
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------
+# Gráfico 2: Top categorías
+# -------------------------
 with col_g2:
-    st.subheader("Categorías por Mall")
-    categorias_mall = pd.crosstab(
-        df_filtrado["shopping_mall"],
-        df_filtrado["category"]
+    st.subheader("Top categorías por centro comercial")
+
+    mall_categoria = st.selectbox(
+        "Selecciona un centro comercial (Categorías)",
+        df_filtrado["shopping_mall"].unique()
     )
-    st.bar_chart(categorias_mall)
 
-st.markdown("---")
+    datos_mall = df_filtrado[df_filtrado["shopping_mall"] == mall_categoria]
 
-col_g3, col_g4 = st.columns(2)
-
-# Perfil del comprador por Mall
-with col_g3:
-    st.subheader("Perfil del comprador por Mall")
-    perfil = pd.crosstab(
-        df_filtrado["shopping_mall"],
-        df_filtrado["gender"]
-    )
-    st.bar_chart(perfil)
-
-# Top 5 categorías con mayor venta
-with col_g4:
-    st.subheader("Top 5 categorías con mayor venta")
-    
     top_categorias = (
-        df_filtrado
+        datos_mall
         .groupby("category")["price"]
         .sum()
         .sort_values(ascending=False)
@@ -122,3 +144,53 @@ with col_g4:
     )
 
     st.bar_chart(top_categorias)
+
+# =========================
+# SEGUNDA FILA DE GRÁFICOS
+# =========================
+
+col_g3, col_g4 = st.columns(2)
+
+# -------------------------
+# Gráfico 3: Perfil del comprador (mejorado)
+# -------------------------
+with col_g3:
+    st.subheader("Distribución de compras por género")
+
+    genero_counts = df_filtrado["gender"].value_counts().reset_index()
+    genero_counts.columns = ["Genero", "Cantidad"]
+
+    fig2 = px.pie(
+        genero_counts,
+        names="Genero",
+        values="Cantidad",
+        title="Distribución por género"
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
+
+# -------------------------
+# Gráfico 4: Ticket por edad
+# -------------------------
+with col_g4:
+    st.subheader("Ticket promedio por rango de edad")
+
+    bins = [0, 18, 25, 35, 45, 55, 65, 100]
+    labels = ["<18","18-25","26-35","36-45","46-55","56-65","65+"]
+
+    df_filtrado["edad_rango"] = pd.cut(df_filtrado["age"], bins=bins, labels=labels)
+
+    ticket_edad = (
+        df_filtrado.groupby("edad_rango")["price"]
+        .mean()
+        .reset_index()
+    )
+
+    fig3 = px.bar(
+        ticket_edad,
+        x="edad_rango",
+        y="price",
+        title="Ticket promedio por edad"
+    )
+
+    st.plotly_chart(fig3, use_container_width=True)
